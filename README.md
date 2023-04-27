@@ -16,10 +16,14 @@ The code will print a increasing number in the right-bottom corner and run the d
 BUG: The touch sensor sometimes throws errors due to i2c communication although the
 component is issueing a reset. 
 
-Set esp-idf target to ESP32S3.
-Using lvgl release 8.3
+* Set esp-idf target to ESP32S3, other versions might lack rgb panel support.
+* The supplied sdkconfig.defaults configures SPIRAM, regenerate your sdkconfig if needed.
 
+
+Using lvgl release 8.3
 
 Clone repository with:
 
     git clone --recurse-submodules <url>
+
+
