@@ -17,3 +17,9 @@ BUG: The touch sensor sometimes throws errors due to i2c communication although 
 component is issueing a reset. 
 
 Set esp-idf target to ESP32S3.
+Using lvgl release 8.3
+
+
+Clone repository with:
+
+    git clone --recurse-submodules <url>
