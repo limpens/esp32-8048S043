@@ -13,7 +13,7 @@
 
 #define TAG "display"
 
-const i2c_port_t i2c_master_port = 0;
+const i2c_port_t i2c_master_port = (i2c_port_t)0;
 
 static void lcd_lvgl_flush_cb(lv_disp_drv_t *drv, const lv_area_t *area, lv_color_t *color_map)
 {
