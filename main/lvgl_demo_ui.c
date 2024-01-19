@@ -7,6 +7,8 @@
 #include <math.h>
 #include "lvgl.h"
 
+#include "lcd.h"
+
 #ifndef PI
 #define PI  (3.14159f)
 #endif
@@ -34,6 +36,8 @@ static void anim_timer_cb(lv_timer_t *timer)
     my_timer_context_t *timer_ctx = (my_timer_context_t *) timer->user_data;
     int count = timer_ctx->count_val;
     lv_obj_t *scr = timer_ctx->scr;
+
+    lvgl_acquire();
 
     // Play arc animation
     if (count < 90) {
@@ -72,10 +76,14 @@ static void anim_timer_cb(lv_timer_t *timer)
     } else {
         timer_ctx->count_val = count;
     }
+
+    lvgl_release();
 }
 
 void example_lvgl_demo_ui(lv_obj_t *scr)
 {
+    lvgl_acquire();
+
     // Create image
     img_logo = lv_img_create(scr);
     lv_img_set_src(img_logo, &esp_logo);
@@ -105,4 +113,6 @@ void example_lvgl_demo_ui(lv_obj_t *scr)
     };
     my_tim_ctx.scr = scr;
     lv_timer_create(anim_timer_cb, 20, &my_tim_ctx);
+
+  lvgl_release();
 }

@@ -13,7 +13,9 @@
 
 #define TAG "display"
 
-const i2c_port_t i2c_master_port = (i2c_port_t)0;
+const i2c_port_t i2c_master_port = I2C_NUM_0;
+static SemaphoreHandle_t xGuiSemaphore = NULL;
+static TaskHandle_t g_lvgl_task_handle;
 
 static void lcd_lvgl_flush_cb(lv_disp_drv_t *drv, const lv_area_t *area, lv_color_t *color_map)
 {
@@ -33,8 +35,8 @@ i2c_config_t conf = {
   .mode       = I2C_MODE_MASTER,
   .sda_io_num = TOUCH_PIN_SDA,
   .scl_io_num = TOUCH_PIN_SCL,
-  .sda_pullup_en = GPIO_PULLUP_DISABLE,
-  .scl_pullup_en = GPIO_PULLUP_DISABLE,
+  .sda_pullup_en = GPIO_PULLUP_ENABLE,
+  .scl_pullup_en = GPIO_PULLUP_ENABLE,
   .master
   {
     .clk_speed = TOUCH_FREQ_HZ,
@@ -66,14 +68,26 @@ void process_coordinates(esp_lcd_touch_handle_t tp, uint16_t *x, uint16_t *y, ui
 void gt911_touch_init(esp_lcd_touch_handle_t *tp)
 {
 esp_lcd_panel_io_handle_t tp_io_handle = nullptr;
-esp_lcd_panel_io_i2c_config_t tp_io_config = ESP_LCD_TOUCH_IO_I2C_GT911_CONFIG();
+
+const esp_lcd_panel_io_i2c_config_t tp_io_config = { .dev_addr = ESP_LCD_TOUCH_IO_I2C_GT911_ADDRESS,
+  .on_color_trans_done = nullptr,
+  .user_ctx = nullptr,
+  .control_phase_bytes = 1,
+  .dc_bit_offset = 0,
+  .lcd_cmd_bits = 16,
+  .lcd_param_bits = 0,
+  .flags = {
+    .dc_low_on_data = 0,
+    .disable_control_phase = 1,
+  } };
+
 const esp_lcd_touch_config_t tp_cfg = {
   .x_max = LCD_H_RES,
   .y_max = LCD_V_RES,
   .rst_gpio_num = TOUCH_PIN_RESET,
-  .int_gpio_num = GPIO_NUM_NC,
+  .int_gpio_num = TOUCH_PIN_INT,
   .levels = {
-      .reset = 1,
+      .reset = 0,
       .interrupt = 0,
   },
   .flags = {
@@ -113,12 +127,35 @@ static void gt911_touchpad_read(lv_indev_drv_t *indev_drv, lv_indev_data_t *data
   }
 }
 
+extern "C" void lvgl_acquire(void)
+{
+    TaskHandle_t task = xTaskGetCurrentTaskHandle();
+    if (g_lvgl_task_handle != task)
+    {
+        xSemaphoreTake(xGuiSemaphore, portMAX_DELAY);
+    }
+}
+
+extern "C" void lvgl_release(void)
+{
+    TaskHandle_t task = xTaskGetCurrentTaskHandle();
+    if (g_lvgl_task_handle != task)
+    {
+        xSemaphoreGive(xGuiSemaphore);
+    }
+}
+
 void lvUpdateTask(void *)
 {
   while(true)
   {
-    lv_task_handler();
-    vTaskDelay(pdMS_TO_TICKS(10));
+    vTaskDelay(pdMS_TO_TICKS(20));
+
+    if (pdTRUE == xSemaphoreTake(xGuiSemaphore, portMAX_DELAY))
+    {
+      lv_task_handler();
+      xSemaphoreGive(xGuiSemaphore);
+    }
   }
 }
 
@@ -128,8 +165,9 @@ esp_err_t LCDInit(void)
 static lv_disp_draw_buf_t disp_buf; // contains internal graphic buffer(s) called draw buffer(s)
 static lv_disp_drv_t disp_drv;      // contains callback functions
 static lv_indev_drv_t indev_drv_tp;
-esp_lcd_touch_handle_t tp;
-esp_lcd_panel_handle_t panel_handle = nullptr;
+static esp_lcd_touch_handle_t tp;
+static esp_lcd_panel_handle_t panel_handle = nullptr;
+
 gpio_config_t bk_gpio_config = {
   .pin_bit_mask = 1ULL << LCD_PIN_BK_LIGHT,
   .mode         = GPIO_MODE_OUTPUT,
@@ -252,9 +290,11 @@ esp_lcd_rgb_panel_config_t panel_config = {
   indev_drv_tp.read_cb = gt911_touchpad_read;
   indev_drv_tp.user_data = tp;
 
+  xGuiSemaphore = xSemaphoreCreateMutex();
+
   if (lv_indev_drv_register(&indev_drv_tp))
   {
-    xTaskCreate(&lvUpdateTask, "lv_update", 4096, nullptr, tskIDLE_PRIORITY, nullptr);
+    xTaskCreatePinnedToCore(&lvUpdateTask, "lv_update", 4096, nullptr, tskIDLE_PRIORITY, &g_lvgl_task_handle, 1);
     return ESP_OK;
   }
 

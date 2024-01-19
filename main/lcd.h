@@ -55,6 +55,23 @@
 #define TOUCH_PIN_RESET       (gpio_num_t)GPIO_NUM_38 // REST
 #define TOUCH_PIN_SCL         (gpio_num_t)GPIO_NUM_20
 #define TOUCH_PIN_SDA         (gpio_num_t)GPIO_NUM_19
+#define TOUCH_PIN_INT         (gpio_num_t)GPIO_NUM_18
 #define TOUCH_FREQ_HZ         (400000)
 
 esp_err_t LCDInit(void);
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+void lvgl_acquire(void);
+#ifdef __cplusplus
+}
+#endif
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+void lvgl_release(void);
+#ifdef __cplusplus
+}
+#endif
